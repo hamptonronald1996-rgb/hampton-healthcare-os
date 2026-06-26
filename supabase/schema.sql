@@ -1,0 +1,20 @@
+
+create extension if not exists "uuid-ossp";
+create table if not exists public.profiles (id uuid primary key references auth.users(id) on delete cascade, created_at timestamptz not null default now(), full_name text not null, role text not null default 'admin', phone text, email text);
+create table if not exists public.clients (id uuid primary key default uuid_generate_v4(), created_at timestamptz not null default now(), full_name text not null, phone text, email text, address text, city text, status text not null default 'lead', service_needed text, preferred_schedule text, emergency_contact_name text, emergency_contact_phone text, notes text);
+create table if not exists public.caregivers (id uuid primary key default uuid_generate_v4(), created_at timestamptz not null default now(), full_name text not null, phone text, email text, status text not null default 'applicant', experience text, certifications text, availability text, background_check_status text default 'pending', notes text);
+create table if not exists public.care_plans (id uuid primary key default uuid_generate_v4(), created_at timestamptz not null default now(), client_id uuid references public.clients(id) on delete cascade, goals text, tasks text, mobility_notes text, medication_reminders text, safety_concerns text, supervisor_notes text);
+create table if not exists public.documents (id uuid primary key default uuid_generate_v4(), created_at timestamptz not null default now(), title text not null, category text not null, related_type text, related_id uuid, url text, notes text);
+create table if not exists public.shifts (id uuid primary key default uuid_generate_v4(), created_at timestamptz not null default now(), client_id uuid references public.clients(id) on delete set null, caregiver_id uuid references public.caregivers(id) on delete set null, start_time timestamptz, end_time timestamptz, status text not null default 'scheduled', tasks text, visit_notes text);
+alter table public.profiles enable row level security;
+alter table public.clients enable row level security;
+alter table public.caregivers enable row level security;
+alter table public.care_plans enable row level security;
+alter table public.documents enable row level security;
+alter table public.shifts enable row level security;
+drop policy if exists "authenticated_manage_profiles" on public.profiles; create policy "authenticated_manage_profiles" on public.profiles for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+drop policy if exists "authenticated_manage_clients" on public.clients; create policy "authenticated_manage_clients" on public.clients for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+drop policy if exists "authenticated_manage_caregivers" on public.caregivers; create policy "authenticated_manage_caregivers" on public.caregivers for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+drop policy if exists "authenticated_manage_care_plans" on public.care_plans; create policy "authenticated_manage_care_plans" on public.care_plans for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+drop policy if exists "authenticated_manage_documents" on public.documents; create policy "authenticated_manage_documents" on public.documents for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+drop policy if exists "authenticated_manage_shifts" on public.shifts; create policy "authenticated_manage_shifts" on public.shifts for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
