@@ -205,15 +205,31 @@ function AppShell({ session }) {
 
   async function loadData() {
     if (!supabaseConfigured || !supabase || !session) return;
-    const [clientResult, caregiverResult, intakeResult] = await Promise.all([
+    const [clientResult, caregiverResult, intakeResponse] = await Promise.all([
       supabase.from("clients").select("*").order("created_at", { ascending: false }),
       supabase.from("caregivers").select("*").order("created_at", { ascending: false }),
-      supabase.from("submissions").select("*").neq("type", "caregiver_application").order("created_at", { ascending: false }),
+      fetch("/api/intakes", {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      }),
     ]);
+
     if (!clientResult.error) setClients(clientResult.data || []);
     if (!caregiverResult.error) setCaregivers(caregiverResult.data || []);
-    if (!intakeResult.error) setIntakes(intakeResult.data || []);
-    else console.error("Unable to load patient intakes", intakeResult.error);
+
+    try {
+      const intakePayload = await intakeResponse.json();
+
+      if (!intakeResponse.ok) {
+        throw new Error(intakePayload.error || "Unable to load patient intakes.");
+      }
+
+      setIntakes(intakePayload.submissions || []);
+    } catch (error) {
+      console.error("Unable to load patient intakes", error);
+      alert(friendlyError(error));
+    }
   }
 
   async function addClient(data) {
@@ -224,9 +240,34 @@ function AppShell({ session }) {
   }
 
   async function updateIntakeStatus(intake, status) {
-    const { data, error } = await supabase.from("submissions").update({ type: status }).eq("id", intake.id).select().single();
-    if (error) { alert(friendlyError(error)); return; }
-    setIntakes((rows) => rows.map((row) => row.id === intake.id ? data : row));
+    try {
+      const response = await fetch("/api/intakes", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          id: intake.id,
+          status,
+        }),
+      });
+
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload.error || "Unable to update patient intake.");
+      }
+
+      setIntakes((rows) =>
+        rows.map((row) =>
+          row.id === intake.id ? payload.submission : row
+        )
+      );
+    } catch (error) {
+      alert(friendlyError(error));
+      throw error;
+    }
   }
 
   async function convertToClient(intake) {
